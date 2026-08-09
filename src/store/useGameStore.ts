@@ -41,8 +41,11 @@ interface GameState {
   timerSecondsLeft: number;
 
   darkMode: boolean;
+  stageMode: boolean;
 
   // actions
+  toggleStageMode: () => void;
+  setStageMode: (v: boolean) => void;
   setEventMeta: (name: string, subtitle: string) => void;
   startEvent: () => void;
   goToRound: (round: RoundKey) => void;
@@ -61,6 +64,7 @@ interface GameState {
 
   // Buzzer Actions
   openBuzzer: () => void;
+  lockBuzzer: () => void;
   pressBuzzer: (candidateId: string, candidateName: string, seatNumber?: string) => void;
   resetBuzzer: () => void;
   passToNextFastest: () => void;
@@ -98,7 +102,7 @@ export const useGameStore = create<GameState>()(
       r1Revealed: false,
 
       r2Index: 0,
-      r2TimerDuration: 30,
+      r2TimerDuration: 45,
       round2Mode: 'buzzer',
 
       buzzerStatus: 'idle',
@@ -113,10 +117,13 @@ export const useGameStore = create<GameState>()(
       currentAnsweringRankIndex: 0,
 
       timerRunning: false,
-      timerSecondsLeft: 30,
+      timerSecondsLeft: 45,
 
       darkMode: true,
+      stageMode: false,
 
+      toggleStageMode: () => set((state) => ({ stageMode: !state.stageMode })),
+      setStageMode: (v) => set({ stageMode: v }),
       setEventMeta: (eventName, subtitle) => set({ eventName, subtitle }),
       startEvent: () => set({ eventStarted: true, currentRound: 'round1' }),
       goToRound: (round) => set({ currentRound: round }),
@@ -247,6 +254,15 @@ export const useGameStore = create<GameState>()(
           buzzerOpenTime: null,
         });
         buzzerSync.send({ type: 'RESET_BUZZER', payload: {} });
+      },
+
+      lockBuzzer: () => {
+        const state = get();
+        set({ buzzerStatus: 'locked' });
+        buzzerSync.send({
+          type: 'BUZZER_STATE_UPDATE',
+          payload: { status: 'locked', openTime: state.buzzerOpenTime },
+        });
       },
 
       passToNextFastest: () => {

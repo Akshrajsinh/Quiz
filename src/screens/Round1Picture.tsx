@@ -23,7 +23,7 @@ export default function Round1Picture() {
   const { bank, setBank, r1Index, r1Revealed, nextR1, prevR1, revealR1, goToR1, goToRound, awardScore } =
     useGameStore();
   const question = bank.round1[r1Index];
-  const { secondsLeft, running, start, reset } = useCountdown(30);
+  const { secondsLeft, running, start, reset } = useCountdown(45);
   const [scoreGranted, setScoreGranted] = useState<boolean | null>(null);
   const [showAddForm, setShowAddForm] = useState(bank.round1.length === 0);
   const [draft, setDraft] = useState<ImageQuestion>(emptyDraft());
@@ -34,7 +34,7 @@ export default function Round1Picture() {
 
   // Reset timer and start it automatically when question changes
   useEffect(() => {
-    reset(30);
+    reset(45);
     setScoreGranted(null);
     timerStartedRef.current = false;
     // Start timer automatically when question loads and is not revealed yet

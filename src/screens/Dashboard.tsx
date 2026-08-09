@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Play, RotateCcw, Maximize, Settings2, Award } from 'lucide-react';
+import { Play, RotateCcw, Settings2, Award, Tv } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import GlassCard from '../components/GlassCard';
 import MandalaRing from '../components/MandalaRing';
@@ -11,14 +11,6 @@ import QuestionManager from './QuestionManager';
 import type { RoundKey } from '../types';
 
 type PlayableRound = 'round1' | 'round2';
-
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen().catch(() => {});
-  }
-}
 
 export default function Dashboard() {
   const { eventName, subtitle, eventStarted, currentRound, totalScore, roundScores, startEvent, goToRound, resetGame } =
@@ -114,12 +106,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3 w-full">
           <button
             onClick={() => {
-              sfx.click();
-              toggleFullscreen();
+              sfx.navigate();
+              goToRound('poster');
             }}
-            className="btn-secondary flex items-center justify-center gap-2"
+            className="btn-secondary flex items-center justify-center gap-2 text-marigold border-marigold/40 hover:bg-marigold/10"
           >
-            <Maximize size={18} /> Full Screen
+            <Tv size={18} /> Stage Poster
           </button>
           <button
             onClick={() => setShowManager(true)}

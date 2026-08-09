@@ -5,6 +5,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import AmbientBackground from './components/AmbientBackground';
 import TopBar from './components/TopBar';
 import Dashboard from './screens/Dashboard';
+import PosterScreen from './screens/PosterScreen';
 import Round1Picture from './screens/Round1Picture';
 import Round2MCQ from './screens/Round2MCQ';
 import Scoreboard from './screens/Scoreboard';
@@ -12,6 +13,7 @@ import MobileBuzzerView from './screens/MobileBuzzerView';
 
 const screens = {
   dashboard: Dashboard,
+  poster: PosterScreen,
   round1: Round1Picture,
   round2: Round2MCQ,
   scoreboard: Scoreboard,

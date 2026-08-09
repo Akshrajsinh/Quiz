@@ -20,7 +20,7 @@ export interface MCQQuestion {
   points?: number;
 }
 
-export type RoundKey = 'dashboard' | 'round1' | 'round2' | 'scoreboard';
+export type RoundKey = 'dashboard' | 'poster' | 'round1' | 'round2' | 'scoreboard';
 
 export interface EventMeta {
   eventName: string;

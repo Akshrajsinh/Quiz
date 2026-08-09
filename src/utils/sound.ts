@@ -59,6 +59,14 @@ export const sfx = {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 0.4, { gain: 0.25, delay: i * 0.15 }));
   },
   whoosh: () => tone(300, 0.3, { type: 'sine', gain: 0.12, glideTo: 60 }),
+  buzzerOpen: () => {
+    tone(440, 0.1, { type: 'sine', gain: 0.2 });
+    tone(880, 0.25, { type: 'triangle', gain: 0.3, delay: 0.08 });
+  },
+  buzzerPress: () => {
+    tone(880, 0.12, { type: 'square', gain: 0.35 });
+    tone(1174.66, 0.25, { type: 'square', gain: 0.35, delay: 0.08 });
+  },
 };
 
 export function unlockAudio() {

@@ -1,8 +1,20 @@
 import { useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { X, Upload, Download, Plus, Trash2, Save, PencilLine, Music4, ImageIcon } from 'lucide-react';
+import { motion, Reorder } from 'framer-motion';
+import {
+  X,
+  Upload,
+  Download,
+  Plus,
+  Trash2,
+  Save,
+  PencilLine,
+  ImageIcon,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
-import type { Team, ImageQuestion, MCQQuestion, BhajanTrack, WheelTopic } from '../types';
+import type { ImageQuestion, MCQQuestion } from '../types';
 import { sfx } from '../utils/sound';
 import { compressImageToDataUrl } from '../utils/image';
 
@@ -23,22 +35,6 @@ const emptyMCQ = (): MCQQuestion => ({
   category: '',
   difficulty: 'medium',
   points: 10,
-});
-
-const emptyBhajan = (): BhajanTrack => ({
-  id: `b-${Date.now()}`,
-  audioUrl: '',
-  bhajanName: '',
-  singer: '',
-  hint: '',
-  points: 15,
-});
-
-const emptyTopic = (): WheelTopic => ({
-  id: `t-${Date.now()}`,
-  label: '',
-  isArrivalTopic: false,
-  color: '#FF6B1A',
 });
 
 function parseCsvToQuestions(text: string) {
@@ -63,30 +59,20 @@ function parseCsvToQuestions(text: string) {
 }
 
 export default function QuestionManager({ onClose }: { onClose: () => void }) {
-  const { bank, setBank, teams, setTeams, eventName, subtitle, setEventMeta } = useGameStore();
+  const { bank, setBank, eventName, subtitle, setEventMeta } = useGameStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<
-    'pictures' | 'questions' | 'bhajans' | 'wheel' | 'teams' | 'import' | 'event'
-  >('pictures');
-  const [localTeams, setLocalTeams] = useState<Team[]>(teams);
+  const [tab, setTab] = useState<'pictures' | 'questions' | 'import' | 'event'>('pictures');
   const [localName, setLocalName] = useState(eventName);
   const [localSubtitle, setLocalSubtitle] = useState(subtitle);
   const [importMsg, setImportMsg] = useState('');
 
-  // Dynamic "type your own" forms
+  // Dynamic forms
   const [pictureDraft, setPictureDraft] = useState<ImageQuestion>(emptyPicture());
   const pictureFileRef = useRef<HTMLInputElement>(null);
   const [editingPictureId, setEditingPictureId] = useState<string | null>(null);
 
   const [mcqDraft, setMcqDraft] = useState<MCQQuestion>(emptyMCQ());
   const [editingMcqId, setEditingMcqId] = useState<string | null>(null);
-
-  const [bhajanDraft, setBhajanDraft] = useState<BhajanTrack>(emptyBhajan());
-  const bhajanFileRef = useRef<HTMLInputElement>(null);
-  const [editingBhajanId, setEditingBhajanId] = useState<string | null>(null);
-
-  const [topicDraft, setTopicDraft] = useState<WheelTopic>(emptyTopic());
-  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
 
   const savePicture = () => {
     if (!pictureDraft.image || !pictureDraft.question.trim() || !pictureDraft.correctAnswer.trim()) {
@@ -124,6 +110,15 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const movePicture = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= bank.round1.length) return;
+    const list = [...bank.round1];
+    const [moved] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, moved);
+    setBank({ ...bank, round1: list });
+    sfx.click();
+  };
+
   const saveMcq = () => {
     if (!mcqDraft.question.trim() || mcqDraft.options.some((o) => !o.trim())) {
       sfx.wrong();
@@ -153,62 +148,13 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const saveBhajan = () => {
-    if (!bhajanDraft.bhajanName.trim()) {
-      sfx.wrong();
-      setImportMsg('Please enter the bhajan name.');
-      return;
-    }
-    if (editingBhajanId) {
-      setBank({ ...bank, round3: bank.round3.map((b) => (b.id === editingBhajanId ? bhajanDraft : b)) });
-    } else {
-      setBank({ ...bank, round3: [...bank.round3, bhajanDraft] });
-    }
-    sfx.correct();
-    setBhajanDraft(emptyBhajan());
-    setEditingBhajanId(null);
-  };
-
-  const editBhajan = (b: BhajanTrack) => {
-    setBhajanDraft(b);
-    setEditingBhajanId(b.id);
-  };
-
-  const deleteBhajan = (id: string) => {
-    setBank({ ...bank, round3: bank.round3.filter((b) => b.id !== id) });
-    if (editingBhajanId === id) {
-      setBhajanDraft(emptyBhajan());
-      setEditingBhajanId(null);
-    }
-  };
-
-  const saveTopic = () => {
-    if (!topicDraft.label.trim()) {
-      sfx.wrong();
-      setImportMsg('Please enter a topic label.');
-      return;
-    }
-    if (editingTopicId) {
-      setBank({ ...bank, round4: bank.round4.map((t) => (t.id === editingTopicId ? topicDraft : t)) });
-    } else {
-      setBank({ ...bank, round4: [...bank.round4, topicDraft] });
-    }
-    sfx.correct();
-    setTopicDraft(emptyTopic());
-    setEditingTopicId(null);
-  };
-
-  const editTopic = (t: WheelTopic) => {
-    setTopicDraft(t);
-    setEditingTopicId(t.id);
-  };
-
-  const deleteTopic = (id: string) => {
-    setBank({ ...bank, round4: bank.round4.filter((t) => t.id !== id) });
-    if (editingTopicId === id) {
-      setTopicDraft(emptyTopic());
-      setEditingTopicId(null);
-    }
+  const moveMcq = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= bank.round2.length) return;
+    const list = [...bank.round2];
+    const [moved] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, moved);
+    setBank({ ...bank, round2: list });
+    sfx.click();
   };
 
   const handleFile = async (file: File) => {
@@ -243,11 +189,6 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
     URL.revokeObjectURL(url);
   };
 
-  const saveTeams = () => {
-    setTeams(localTeams);
-    sfx.correct();
-  };
-
   const saveEvent = () => {
     setEventMeta(localName, localSubtitle);
     sfx.correct();
@@ -275,7 +216,7 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
-          {(['pictures', 'questions', 'bhajans', 'wheel', 'teams', 'import', 'event'] as const).map((t) => (
+          {(['pictures', 'questions', 'import', 'event'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -289,15 +230,11 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
                 ? 'Round 1 · Pictures'
                 : t === 'questions'
                 ? 'Round 2 · MCQ'
-                : t === 'bhajans'
-                ? 'Round 3 · Bhajans'
-                : t === 'wheel'
-                ? 'Round 4 · Wheel'
                 : t}
             </button>
           ))}
         </div>
-        {importMsg && (tab === 'pictures' || tab === 'questions' || tab === 'bhajans' || tab === 'wheel') && (
+        {importMsg && (tab === 'pictures' || tab === 'questions') && (
           <p className="text-sm text-kumkum mb-4 text-center">{importMsg}</p>
         )}
 
@@ -391,27 +328,80 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
 
             <div>
               <p className="text-xs font-score uppercase tracking-wide text-cream/40 mb-2">
-                {bank.round1.length} picture question{bank.round1.length === 1 ? '' : 's'} in Round 1
+                {bank.round1.length} picture question{bank.round1.length === 1 ? '' : 's'} in Round 1 · Drag or use arrows to change index
               </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1">
+              <Reorder.Group
+                axis="y"
+                values={bank.round1}
+                onReorder={(newRound1) => setBank({ ...bank, round1: newRound1 })}
+                className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1"
+              >
                 {bank.round1.map((p, i) => (
-                  <div key={p.id} className="glass rounded-xl px-4 py-2.5 flex items-center gap-3">
-                    <span className="text-xs text-cream/40 font-score w-5 shrink-0">{i + 1}.</span>
+                  <Reorder.Item
+                    key={p.id}
+                    value={p}
+                    className="glass rounded-xl px-3 py-2.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing select-none hover:bg-white/10 transition-colors"
+                  >
+                    <GripVertical size={16} className="text-cream/40 hover:text-marigold shrink-0" />
+                    <span className="text-xs text-cream/40 font-score w-6 shrink-0 font-bold">{i + 1}.</span>
                     {p.image ? (
                       <img src={p.image} alt="" className="h-8 w-8 rounded-lg object-cover shrink-0" />
                     ) : (
                       <ImageIcon size={16} className="text-cream/30 shrink-0" />
                     )}
                     <span className="flex-1 text-sm text-cream/80 truncate">{p.question || '(untitled)'}</span>
-                    <button onClick={() => editPicture(p)} className="text-cream/40 hover:text-marigold p-1.5">
-                      <PencilLine size={15} />
-                    </button>
-                    <button onClick={() => deletePicture(p.id)} className="text-cream/40 hover:text-kumkum p-1.5">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (i > 0) movePicture(i, i - 1);
+                        }}
+                        disabled={i === 0}
+                        className="text-cream/40 hover:text-marigold disabled:opacity-20 p-1 rounded hover:bg-white/10"
+                        title="Move Up"
+                      >
+                        <ArrowUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (i < bank.round1.length - 1) movePicture(i, i + 1);
+                        }}
+                        disabled={i === bank.round1.length - 1}
+                        className="text-cream/40 hover:text-marigold disabled:opacity-20 p-1 rounded hover:bg-white/10"
+                        title="Move Down"
+                      >
+                        <ArrowDown size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          editPicture(p);
+                        }}
+                        className="text-cream/40 hover:text-marigold p-1 rounded hover:bg-white/10"
+                        title="Edit"
+                      >
+                        <PencilLine size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deletePicture(p.id);
+                        }}
+                        className="text-cream/40 hover:text-kumkum p-1 rounded hover:bg-white/10"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </Reorder.Item>
                 ))}
-              </div>
+              </Reorder.Group>
             </div>
           </div>
         )}
@@ -454,7 +444,9 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-cream/40">Tap a letter to mark the correct answer (currently {String.fromCharCode(65 + mcqDraft.correctIndex)}).</p>
+              <p className="text-[11px] text-cream/40">
+                Tap a letter to mark the correct answer (currently {String.fromCharCode(65 + mcqDraft.correctIndex)}).
+              </p>
               <textarea
                 value={mcqDraft.explanation}
                 onChange={(e) => setMcqDraft({ ...mcqDraft, explanation: e.target.value })}
@@ -506,281 +498,76 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
 
             <div>
               <p className="text-xs font-score uppercase tracking-wide text-cream/40 mb-2">
-                {bank.round2.length} question{bank.round2.length === 1 ? '' : 's'} in Round 2
+                {bank.round2.length} question{bank.round2.length === 1 ? '' : 's'} in Round 2 · Drag or use arrows to change index
               </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1">
+              <Reorder.Group
+                axis="y"
+                values={bank.round2}
+                onReorder={(newRound2) => setBank({ ...bank, round2: newRound2 })}
+                className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1"
+              >
                 {bank.round2.map((q, i) => (
-                  <div key={q.id} className="glass rounded-xl px-4 py-2.5 flex items-center gap-3">
-                    <span className="text-xs text-cream/40 font-score w-5 shrink-0">{i + 1}.</span>
+                  <Reorder.Item
+                    key={q.id}
+                    value={q}
+                    className="glass rounded-xl px-3 py-2.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing select-none hover:bg-white/10 transition-colors"
+                  >
+                    <GripVertical size={16} className="text-cream/40 hover:text-marigold shrink-0" />
+                    <span className="text-xs text-cream/40 font-score w-6 shrink-0 font-bold">{i + 1}.</span>
                     <span className="flex-1 text-sm text-cream/80 truncate">{q.question || '(untitled)'}</span>
-                    <button onClick={() => editMcq(q)} className="text-cream/40 hover:text-marigold p-1.5">
-                      <PencilLine size={15} />
-                    </button>
-                    <button onClick={() => deleteMcq(q.id)} className="text-cream/40 hover:text-kumkum p-1.5">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {tab === 'bhajans' && (
-          <div className="space-y-6">
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <p className="text-xs font-score uppercase tracking-wide text-marigold/80">
-                {editingBhajanId ? 'Edit bhajan' : 'Type a new bhajan'}
-              </p>
-              <input
-                value={bhajanDraft.bhajanName}
-                onChange={(e) => setBhajanDraft({ ...bhajanDraft, bhajanName: e.target.value })}
-                placeholder="Bhajan name"
-                className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream focus:border-saffron-400 outline-none"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={bhajanDraft.singer}
-                  onChange={(e) => setBhajanDraft({ ...bhajanDraft, singer: e.target.value })}
-                  placeholder="Singer (optional)"
-                  className="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream text-sm focus:border-saffron-400 outline-none"
-                />
-                <input
-                  type="number"
-                  value={bhajanDraft.points}
-                  onChange={(e) => setBhajanDraft({ ...bhajanDraft, points: Number(e.target.value) })}
-                  placeholder="Points"
-                  className="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream text-sm focus:border-saffron-400 outline-none"
-                />
-              </div>
-              <input
-                value={bhajanDraft.hint}
-                onChange={(e) => setBhajanDraft({ ...bhajanDraft, hint: e.target.value })}
-                placeholder="Hint shown before reveal (optional)"
-                className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream focus:border-saffron-400 outline-none"
-              />
-              <input
-                value={bhajanDraft.audioUrl}
-                onChange={(e) => setBhajanDraft({ ...bhajanDraft, audioUrl: e.target.value })}
-                placeholder="Audio URL (optional)"
-                className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream text-sm focus:border-saffron-400 outline-none"
-              />
-              <div className="flex items-center gap-2">
-                <input
-                  ref={bhajanFileRef}
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 8 * 1024 * 1024) {
-                      setImportMsg(
-                        'That\'s a fairly large audio file. It will still be saved, but for a snappier experience consider trimming clips to ~20-30s.'
-                      );
-                    }
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      setBhajanDraft((prev) => ({ ...prev, audioUrl: reader.result as string }));
-                    };
-                    reader.readAsDataURL(file);
-                    e.target.value = '';
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => bhajanFileRef.current?.click()}
-                  className="btn-secondary text-sm py-2 px-4 flex items-center gap-2"
-                >
-                  <Upload size={15} /> Upload Audio File
-                </button>
-                {bhajanDraft.audioUrl && (
-                  <span className="text-xs text-emerald flex items-center gap-1">
-                    <Music4 size={13} /> attached
-                  </span>
-                )}
-                {bhajanDraft.audioUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setBhajanDraft((prev) => ({ ...prev, audioUrl: '' }))}
-                    className="text-cream/40 hover:text-kumkum text-xs"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {bhajanDraft.audioUrl && (
-                <audio controls src={bhajanDraft.audioUrl} className="w-full h-10 rounded-xl" />
-              )}
-              <p className="text-[11px] text-cream/35">
-                Pre-load all 12 tunes here before the event, the same way you build the Round 1 picture
-                bank — each track (name, singer, hint, points, and its audio file) is saved with the event
-                and stays available next time you open this browser.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={saveBhajan} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                  <Plus size={16} /> {editingBhajanId ? 'Save Changes' : 'Add Bhajan'}
-                </button>
-                {editingBhajanId && (
-                  <button
-                    onClick={() => {
-                      setBhajanDraft(emptyBhajan());
-                      setEditingBhajanId(null);
-                    }}
-                    className="btn-secondary px-4"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-score uppercase tracking-wide text-cream/40 mb-2">
-                {bank.round3.length} bhajan{bank.round3.length === 1 ? '' : 's'} in Round 3
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1">
-                {bank.round3.map((b, i) => (
-                  <div key={b.id} className="glass rounded-xl px-4 py-2.5 flex items-center gap-3">
-                    <span className="text-xs text-cream/40 font-score w-5 shrink-0">{i + 1}.</span>
-                    <span className="flex-1 text-sm text-cream/80 truncate">{b.bhajanName || '(untitled)'}</span>
-                    {b.audioUrl && <Music4 size={13} className="text-emerald shrink-0" />}
-                    <button onClick={() => editBhajan(b)} className="text-cream/40 hover:text-marigold p-1.5">
-                      <PencilLine size={15} />
-                    </button>
-                    <button onClick={() => deleteBhajan(b.id)} className="text-cream/40 hover:text-kumkum p-1.5">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (i > 0) moveMcq(i, i - 1);
+                        }}
+                        disabled={i === 0}
+                        className="text-cream/40 hover:text-marigold disabled:opacity-20 p-1 rounded hover:bg-white/10"
+                        title="Move Up"
+                      >
+                        <ArrowUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (i < bank.round2.length - 1) moveMcq(i, i + 1);
+                        }}
+                        disabled={i === bank.round2.length - 1}
+                        className="text-cream/40 hover:text-marigold disabled:opacity-20 p-1 rounded hover:bg-white/10"
+                        title="Move Down"
+                      >
+                        <ArrowDown size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          editMcq(q);
+                        }}
+                        className="text-cream/40 hover:text-marigold p-1 rounded hover:bg-white/10"
+                        title="Edit"
+                      >
+                        <PencilLine size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMcq(q.id);
+                        }}
+                        className="text-cream/40 hover:text-kumkum p-1 rounded hover:bg-white/10"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </Reorder.Item>
                 ))}
-              </div>
+              </Reorder.Group>
             </div>
-          </div>
-        )}
-
-        {tab === 'wheel' && (
-          <div className="space-y-6">
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <p className="text-xs font-score uppercase tracking-wide text-marigold/80">
-                {editingTopicId ? 'Edit topic' : 'Type a new wheel topic'}
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={topicDraft.color}
-                  onChange={(e) => setTopicDraft({ ...topicDraft, color: e.target.value })}
-                  className="h-10 w-10 rounded-lg bg-transparent cursor-pointer shrink-0"
-                />
-                <input
-                  value={topicDraft.label}
-                  onChange={(e) => setTopicDraft({ ...topicDraft, label: e.target.value })}
-                  placeholder="Topic label"
-                  className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream focus:border-saffron-400 outline-none"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-cream/60">
-                <input
-                  type="checkbox"
-                  checked={!!topicDraft.isArrivalTopic}
-                  onChange={(e) => setTopicDraft({ ...topicDraft, isArrivalTopic: e.target.checked })}
-                  className="accent-saffron-500"
-                />
-                This is the special "Arrival Topic" (2-minute impromptu prompt)
-              </label>
-              <div className="flex gap-2">
-                <button onClick={saveTopic} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                  <Plus size={16} /> {editingTopicId ? 'Save Changes' : 'Add Topic'}
-                </button>
-                {editingTopicId && (
-                  <button
-                    onClick={() => {
-                      setTopicDraft(emptyTopic());
-                      setEditingTopicId(null);
-                    }}
-                    className="btn-secondary px-4"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-score uppercase tracking-wide text-cream/40 mb-2">
-                {bank.round4.length} topic{bank.round4.length === 1 ? '' : 's'} on the wheel
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1">
-                {bank.round4.map((t) => (
-                  <div key={t.id} className="glass rounded-xl px-4 py-2.5 flex items-center gap-3">
-                    <span
-                      className="h-3 w-3 rounded-full shrink-0"
-                      style={{ background: t.color, boxShadow: `0 0 8px ${t.color}` }}
-                    />
-                    <span className="flex-1 text-sm text-cream/80 truncate">
-                      {t.label || '(untitled)'} {t.isArrivalTopic && <em className="text-marigold/70">· arrival</em>}
-                    </span>
-                    <button onClick={() => editTopic(t)} className="text-cream/40 hover:text-marigold p-1.5">
-                      <PencilLine size={15} />
-                    </button>
-                    <button onClick={() => deleteTopic(t.id)} className="text-cream/40 hover:text-kumkum p-1.5">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === 'teams' && (
-          <div className="space-y-3">
-            {localTeams.map((t, i) => (
-              <div key={t.id} className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={t.color}
-                  onChange={(e) => {
-                    const next = [...localTeams];
-                    next[i] = { ...t, color: e.target.value };
-                    setLocalTeams(next);
-                  }}
-                  className="h-10 w-10 rounded-lg bg-transparent cursor-pointer"
-                />
-                <input
-                  value={t.name}
-                  onChange={(e) => {
-                    const next = [...localTeams];
-                    next[i] = { ...t, name: e.target.value };
-                    setLocalTeams(next);
-                  }}
-                  className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-cream focus:border-saffron-400 outline-none"
-                />
-                <button
-                  onClick={() => setLocalTeams(localTeams.filter((x) => x.id !== t.id))}
-                  className="text-cream/40 hover:text-kumkum p-2"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() =>
-                setLocalTeams([
-                  ...localTeams,
-                  {
-                    id: `team-${Date.now()}`,
-                    name: `Team ${localTeams.length + 1}`,
-                    color: '#FF6B1A',
-                    totalScore: 0,
-                    roundScores: { round1: 0, round2: 0, round3: 0, round4: 0 },
-                  },
-                ])
-              }
-              className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
-            >
-              <Plus size={16} /> Add Team
-            </button>
-            <button onClick={saveTeams} className="btn-primary w-full flex items-center justify-center gap-2">
-              <Save size={18} /> Save Teams
-            </button>
           </div>
         )}
 
@@ -812,8 +599,7 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
             {importMsg && <p className="text-sm text-marigold text-center">{importMsg}</p>}
             <div className="brass-divider" />
             <p className="text-xs text-cream/40">
-              Currently loaded: {bank.round1.length} picture questions · {bank.round2.length} MCQ questions ·{' '}
-              {bank.round3.length} bhajans · {bank.round4.length} wheel topics
+              Currently loaded: {bank.round1.length} picture questions · {bank.round2.length} MCQ questions
             </p>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Play, RotateCcw, Maximize, Settings2, Users } from 'lucide-react';
+import { Play, RotateCcw, Maximize, Settings2, Award } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import GlassCard from '../components/GlassCard';
 import MandalaRing from '../components/MandalaRing';
@@ -10,7 +10,7 @@ import { useState } from 'react';
 import QuestionManager from './QuestionManager';
 import type { RoundKey } from '../types';
 
-type PlayableRound = 'round1' | 'round2' | 'round3' | 'round4';
+type PlayableRound = 'round1' | 'round2';
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
@@ -21,12 +21,10 @@ function toggleFullscreen() {
 }
 
 export default function Dashboard() {
-  const { eventName, subtitle, eventStarted, currentRound, teams, startEvent, goToRound, resetGame } =
+  const { eventName, subtitle, eventStarted, currentRound, totalScore, roundScores, startEvent, goToRound, resetGame } =
     useGameStore();
   const [showManager, setShowManager] = useState(false);
   const [pending, setPending] = useState<{ round: PlayableRound; kind: 'start' | 'nav' } | null>(null);
-
-  const topTeam = [...teams].sort((a, b) => b.totalScore - a.totalScore)[0];
 
   const requestRound = (round: PlayableRound, kind: 'start' | 'nav') => {
     sfx.click();
@@ -70,26 +68,23 @@ export default function Dashboard() {
         <p className="mt-3 font-body text-cream/60 text-lg">{subtitle}</p>
       </motion.div>
 
-      <div className="relative z-10 grid w-full max-w-5xl grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        {teams.map((t, i) => (
-          <GlassCard key={t.id} delay={0.1 + i * 0.08} className="p-5 text-center">
-            <div
-              className="mx-auto mb-3 h-3 w-3 rounded-full"
-              style={{ background: t.color, boxShadow: `0 0 12px ${t.color}` }}
-            />
-            <p className="font-score font-semibold text-cream/90 truncate">{t.name}</p>
-            <p className="mt-1 font-score text-3xl font-bold text-gradient-saffron">{t.totalScore}</p>
-            <p className="text-xs text-cream/40 mt-0.5">points</p>
-          </GlassCard>
-        ))}
+      <div className="relative z-10 grid w-full max-w-2xl grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        <GlassCard delay={0.1} className="p-5 text-center">
+          <p className="font-score font-semibold text-cream/70 text-sm uppercase tracking-wider">Round 1</p>
+          <p className="mt-1 font-score text-3xl font-bold text-gradient-saffron">{roundScores.round1}</p>
+          <p className="text-xs text-cream/40 mt-0.5">picture points</p>
+        </GlassCard>
+        <GlassCard delay={0.18} className="p-5 text-center">
+          <p className="font-score font-semibold text-cream/70 text-sm uppercase tracking-wider">Round 2</p>
+          <p className="mt-1 font-score text-3xl font-bold text-gradient-saffron">{roundScores.round2}</p>
+          <p className="text-xs text-cream/40 mt-0.5">mcq points</p>
+        </GlassCard>
+        <GlassCard delay={0.26} className="p-5 text-center border-marigold/40 shadow-glow">
+          <p className="font-score font-semibold text-marigold text-sm uppercase tracking-wider">Total Score</p>
+          <p className="mt-1 font-score text-3xl font-bold text-gradient-saffron">{totalScore}</p>
+          <p className="text-xs text-cream/40 mt-0.5">total points</p>
+        </GlassCard>
       </div>
-
-      {topTeam && topTeam.totalScore > 0 && (
-        <p className="relative z-10 mb-6 text-sm text-cream/50 font-body">
-          Leading: <span className="text-marigold font-semibold">{topTeam.name}</span> · Round in progress:{' '}
-          <span className="text-cream/70">{currentRound}</span>
-        </p>
-      )}
 
       <GlassCard arch className="relative z-10 w-full max-w-lg p-8 flex flex-col items-center gap-4" delay={0.3}>
         {!eventStarted ? (
@@ -97,13 +92,13 @@ export default function Dashboard() {
             onClick={() => requestRound('round1', 'start')}
             className="btn-primary w-full flex items-center justify-center gap-2 text-lg"
           >
-            <Play size={20} fill="currentColor" /> Start Event
+            <Play size={20} fill="currentColor" /> Start Quiz
           </button>
         ) : (
           <button
             onClick={() => {
               const target = currentRound === 'dashboard' ? 'round1' : currentRound;
-              if (target === 'round1' || target === 'round2' || target === 'round3' || target === 'round4') {
+              if (target === 'round1' || target === 'round2') {
                 requestRound(target, 'nav');
               } else {
                 sfx.click();
@@ -112,7 +107,7 @@ export default function Dashboard() {
             }}
             className="btn-primary w-full flex items-center justify-center gap-2 text-lg"
           >
-            <Play size={20} fill="currentColor" /> Continue Event
+            <Play size={20} fill="currentColor" /> Continue Quiz
           </button>
         )}
 
@@ -134,10 +129,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mt-2 text-xs text-cream/40">
-          <span className="flex items-center gap-1.5">
-            <Users size={14} /> {teams.length} Teams
-          </span>
+        <div className="flex items-center justify-center gap-4 mt-2 text-xs text-cream/40">
           <button
             onClick={() => {
               if (confirm('Reset the entire event? All scores and progress will be cleared.')) {
@@ -151,14 +143,15 @@ export default function Dashboard() {
         </div>
       </GlassCard>
 
-      <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-2">
-        {(['round1', 'round2', 'round3', 'round4'] as const).map((r, i) => (
+      <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-3">
+        {(['round1', 'round2'] as const).map((r, i) => (
           <button
             key={r}
             onClick={() => requestRound(r, 'nav')}
-            className="px-4 py-2 rounded-full glass text-xs font-score text-cream/70 hover:text-marigold hover:scale-105 transition-all"
+            className="px-6 py-2.5 rounded-full glass text-sm font-score text-cream/80 hover:text-marigold hover:scale-105 transition-all flex items-center gap-2"
           >
-            Round {i + 1}
+            <Award size={16} className="text-marigold" />
+            Round {i + 1} {i === 0 ? '· Picture Question' : '· MCQ Challenge'}
           </button>
         ))}
       </div>
@@ -170,3 +163,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

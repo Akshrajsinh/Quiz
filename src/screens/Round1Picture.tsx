@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Eye, Upload, Award, ImageIcon, Plus, X, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Upload, Award, ImageIcon, Plus, X } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { usePresenterActions } from '../store/usePresenterActions';
 import { useCountdown } from '../hooks/useCountdown';
@@ -20,11 +20,11 @@ const emptyDraft = (): ImageQuestion => ({
 });
 
 export default function Round1Picture() {
-  const { bank, setBank, r1Index, r1Revealed, nextR1, prevR1, revealR1, goToR1, goToRound, teams, awardPoints } =
+  const { bank, setBank, r1Index, r1Revealed, nextR1, prevR1, revealR1, goToR1, goToRound, awardScore } =
     useGameStore();
   const question = bank.round1[r1Index];
   const { secondsLeft, running, start, reset } = useCountdown(30);
-  const [awardedTeam, setAwardedTeam] = useState<string | null>(null);
+  const [scoreGranted, setScoreGranted] = useState<boolean | null>(null);
   const [showAddForm, setShowAddForm] = useState(bank.round1.length === 0);
   const [draft, setDraft] = useState<ImageQuestion>(emptyDraft());
   const [imageBusy, setImageBusy] = useState(false);
@@ -35,7 +35,7 @@ export default function Round1Picture() {
   // Reset timer and start it automatically when question changes
   useEffect(() => {
     reset(30);
-    setAwardedTeam(null);
+    setScoreGranted(null);
     timerStartedRef.current = false;
     // Start timer automatically when question loads and is not revealed yet
     if (!r1Revealed) {
@@ -61,7 +61,6 @@ export default function Round1Picture() {
     revealR1();
     sfx.reveal();
     fireMarigoldBurst();
-    // Start timer when reveal is clicked
     if (!timerStartedRef.current) {
       start();
       timerStartedRef.current = true;
@@ -73,7 +72,7 @@ export default function Round1Picture() {
       onNext: () => {
         sfx.navigate();
         if (r1Revealed && r1Index >= bank.round1.length - 1) {
-          goToRound('scoreboard');
+          goToRound('round2');
         } else {
           nextR1();
         }
@@ -106,7 +105,6 @@ export default function Round1Picture() {
       setDraft(emptyDraft());
       setShowAddForm(false);
       setImageError('');
-      // jump presenter view to the freshly added question
       goToR1(newIndex);
     } catch {
       sfx.wrong();
@@ -233,6 +231,8 @@ export default function Round1Picture() {
     );
   }
 
+  const pts = question.points ?? 15;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-24 gap-8">
       <div className="flex items-center gap-3 text-xs font-score uppercase tracking-widest text-marigold/70">
@@ -285,29 +285,43 @@ export default function Round1Picture() {
               </button>
             ) : (
               <>
-                <div className="w-full">
-                  <p className="text-xs font-score uppercase tracking-widest text-cream/40 mb-2 text-center">
-                    Award {question.points ?? 15} points to the team that answered correctly:
+                <div className="w-full text-center">
+                  <p className="text-xs font-score uppercase tracking-widest text-cream/40 mb-2">
+                    Score Evaluation:
                   </p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {teams.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          awardPoints(t.id, 'round1', question.points ?? 15);
-                          setAwardedTeam(t.id);
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={() => {
+                        if (scoreGranted !== true) {
+                          awardScore('round1', scoreGranted === false ? pts : pts);
+                          setScoreGranted(true);
                           sfx.correct();
-                        }}
-                        className={`px-3.5 py-2 rounded-xl text-sm font-score flex items-center gap-1.5 transition-all ${
-                          awardedTeam === t.id ? 'bg-emerald/80 text-white' : 'glass text-cream/70 hover:text-cream'
-                        }`}
-                      >
-                        <Award size={14} /> {t.name}
-                      </button>
-                    ))}
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-xl text-sm font-score flex items-center gap-1.5 transition-all ${
+                        scoreGranted === true ? 'bg-emerald text-white shadow-glow-green' : 'glass text-emerald hover:bg-emerald/10'
+                      }`}
+                    >
+                      <Award size={16} /> Correct (+{pts} pts)
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (scoreGranted === true) {
+                          awardScore('round1', -pts);
+                        }
+                        setScoreGranted(false);
+                        sfx.wrong();
+                      }}
+                      className={`px-4 py-2 rounded-xl text-sm font-score flex items-center gap-1.5 transition-all ${
+                        scoreGranted === false ? 'bg-kumkum text-white' : 'glass text-cream/60 hover:text-cream'
+                      }`}
+                    >
+                      Incorrect (+0 pts)
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => {
                       sfx.navigate();
@@ -323,11 +337,11 @@ export default function Round1Picture() {
                       <button
                         onClick={() => {
                           sfx.navigate();
-                          goToRound('scoreboard');
+                          goToRound('round2');
                         }}
                         className="btn-primary flex items-center gap-1.5"
                       >
-                        <Trophy size={18} /> Finish Round · View Scoreboard
+                        Proceed to Round 2 · MCQ <ChevronRight size={18} />
                       </button>
                       <button
                         onClick={() => setShowAddForm(true)}

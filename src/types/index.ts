@@ -20,37 +20,7 @@ export interface MCQQuestion {
   points?: number;
 }
 
-export interface BhajanTrack {
-  id: string;
-  audioUrl: string;
-  bhajanName: string;
-  singer?: string;
-  hint?: string;
-  image?: string;
-  points?: number;
-}
-
-export interface WheelTopic {
-  id: string;
-  label: string;
-  isArrivalTopic?: boolean;
-  color?: string;
-}
-
-export interface Team {
-  id: string;
-  name: string;
-  color: string;
-  totalScore: number;
-  roundScores: {
-    round1: number;
-    round2: number;
-    round3: number;
-    round4: number;
-  };
-}
-
-export type RoundKey = 'dashboard' | 'round1' | 'round2' | 'round3' | 'round4' | 'scoreboard';
+export type RoundKey = 'dashboard' | 'round1' | 'round2' | 'scoreboard';
 
 export interface EventMeta {
   eventName: string;
@@ -62,6 +32,27 @@ export interface EventMeta {
 export interface QuestionBank {
   round1: ImageQuestion[];
   round2: MCQQuestion[];
-  round3: BhajanTrack[];
-  round4: WheelTopic[];
 }
+
+export type Round2Mode = 'standard' | 'buzzer';
+
+export type BuzzerStatus = 'idle' | 'open' | 'locked' | 'answering' | 'evaluated';
+
+export interface Candidate {
+  id: string;
+  name: string;
+  seatNumber?: string;
+  score: number;
+  totalBuzzerWins: number;
+  joinedAt?: number;
+}
+
+export interface FastestFingerRecord {
+  rank: number;
+  candidateId: string;
+  candidateName: string;
+  seatNumber?: string;
+  timestamp: number;
+  responseTimeMs: number;
+}
+

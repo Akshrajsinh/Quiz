@@ -2,15 +2,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
 const shortcuts = [
-  ['→', 'Next question / tune / step'],
+  ['→', 'Next question / step'],
   ['←', 'Previous question'],
   ['Space', 'Reveal answer'],
   ['T', 'Start timer'],
   ['P', 'Pause timer'],
   ['F', 'Toggle full screen'],
   ['S', 'Open / close scoreboard'],
-  ['W', 'Jump to spin wheel'],
-  ['A', 'Play / pause audio'],
   ['Esc', 'Exit full screen'],
 ];
 

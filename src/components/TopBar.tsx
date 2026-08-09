@@ -7,8 +7,8 @@ import OmSymbol from './OmSymbol';
 import { sfx } from '../utils/sound';
 import type { RoundKey } from '../types';
 
-type PlayableRound = 'round1' | 'round2' | 'round3' | 'round4';
-const playableRounds: PlayableRound[] = ['round1', 'round2', 'round3', 'round4'];
+type PlayableRound = 'round1' | 'round2';
+const playableRounds: PlayableRound[] = ['round1', 'round2'];
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
@@ -22,8 +22,6 @@ const navItems: { id: RoundKey; label: string }[] = [
   { id: 'dashboard', label: 'Home' },
   { id: 'round1', label: 'Round 1' },
   { id: 'round2', label: 'Round 2' },
-  { id: 'round3', label: 'Round 3' },
-  { id: 'round4', label: 'Round 4' },
   { id: 'scoreboard', label: 'Scoreboard' },
 ];
 

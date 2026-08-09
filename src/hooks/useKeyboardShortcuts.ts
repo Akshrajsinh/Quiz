@@ -58,14 +58,6 @@ export function useKeyboardShortcuts() {
           if (currentRound !== 'scoreboard') goToRound('scoreboard');
           else goToRound('dashboard');
           break;
-        case 'w':
-        case 'W':
-          if (currentRound !== 'round4') goToRound('round4');
-          break;
-        case 'a':
-        case 'A':
-          handlers.onPlayAudio?.();
-          break;
         case 'Escape':
           if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
           break;

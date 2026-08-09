@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import defaultBank from '../data/questionBank.json';
-import defaultTeams from '../data/teams.json';
 import { indexedDbStorage } from './indexedDbStorage';
-import type { Team, RoundKey, QuestionBank } from '../types';
+import type { RoundKey, QuestionBank, Round2Mode, BuzzerStatus, Candidate, FastestFingerRecord } from '../types';
+import { buzzerSync } from '../utils/buzzerSync';
+import { sfx } from '../utils/sound';
 
 interface GameState {
   eventName: string;
@@ -11,7 +12,12 @@ interface GameState {
   currentRound: RoundKey;
   eventStarted: boolean;
 
-  teams: Team[];
+  totalScore: number;
+  roundScores: {
+    round1: number;
+    round2: number;
+  };
+
   bank: QuestionBank;
 
   // Round 1 progress — Picture Question challenge
@@ -21,14 +27,14 @@ interface GameState {
   // Round 2 progress — MCQ challenge
   r2Index: number;
   r2TimerDuration: 30 | 45 | 60;
+  round2Mode: Round2Mode;
 
-  // Round 3 progress — Bhajan Tune challenge
-  r3Index: number;
-  r3Revealed: boolean;
-
-  // Round 4 progress — Spin Wheel challenge
-  r4SelectedTopicId: string | null;
-  r4Spinning: boolean;
+  // Round 2 Audition Buzzer System State
+  buzzerStatus: BuzzerStatus;
+  buzzerOpenTime: number | null;
+  candidates: Candidate[];
+  buzzerPressFeed: FastestFingerRecord[];
+  currentAnsweringRankIndex: number;
 
   // timer shared state
   timerRunning: boolean;
@@ -40,8 +46,7 @@ interface GameState {
   setEventMeta: (name: string, subtitle: string) => void;
   startEvent: () => void;
   goToRound: (round: RoundKey) => void;
-  setTeams: (teams: Team[]) => void;
-  awardPoints: (teamId: string, round: keyof Team['roundScores'], points: number) => void;
+  awardScore: (round: 'round1' | 'round2', points: number) => void;
   setBank: (bank: QuestionBank) => void;
 
   nextR1: () => void;
@@ -52,13 +57,20 @@ interface GameState {
   nextR2: () => void;
   prevR2: () => void;
   setR2TimerDuration: (d: 30 | 45 | 60) => void;
+  setRound2Mode: (mode: Round2Mode) => void;
 
-  nextR3: () => void;
-  revealR3: () => void;
+  // Buzzer Actions
+  openBuzzer: () => void;
+  pressBuzzer: (candidateId: string, candidateName: string, seatNumber?: string) => void;
+  resetBuzzer: () => void;
+  passToNextFastest: () => void;
 
-  spinWheelStart: () => void;
-  spinWheelStop: (topicId: string) => void;
-  forceStopSpin: () => void;
+  // Candidate Management Actions
+  addCandidate: (name: string, seatNumber?: string) => Candidate;
+  importCandidates: (candidates: Partial<Candidate>[]) => void;
+  removeCandidate: (id: string) => void;
+  clearCandidates: () => void;
+  awardCandidateScore: (candidateId: string, points: number) => void;
 
   startTimer: (seconds: number) => void;
   pauseTimer: () => void;
@@ -70,21 +82,16 @@ interface GameState {
   resetGame: () => void;
 }
 
-const initialTeams: Team[] = (defaultTeams as any[]).map((t) => ({
-  ...t,
-  totalScore: 0,
-  roundScores: { round1: 0, round2: 0, round3: 0, round4: 0 },
-}));
-
 export const useGameStore = create<GameState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       eventName: 'Gyan Challenge',
       subtitle: 'A Spiritual Quiz Celebration',
       currentRound: 'dashboard',
       eventStarted: false,
 
-      teams: initialTeams,
+      totalScore: 0,
+      roundScores: { round1: 0, round2: 0 },
       bank: defaultBank as unknown as QuestionBank,
 
       r1Index: 0,
@@ -92,12 +99,18 @@ export const useGameStore = create<GameState>()(
 
       r2Index: 0,
       r2TimerDuration: 30,
+      round2Mode: 'buzzer',
 
-      r3Index: 0,
-      r3Revealed: false,
-
-      r4SelectedTopicId: null,
-      r4Spinning: false,
+      buzzerStatus: 'idle',
+      buzzerOpenTime: null,
+      candidates: [
+        { id: 'cand-1', name: 'Rameshbhai Patel', seatNumber: 'A-101', score: 0, totalBuzzerWins: 0 },
+        { id: 'cand-2', name: 'Jignesh Shah', seatNumber: 'A-102', score: 0, totalBuzzerWins: 0 },
+        { id: 'cand-3', name: 'Suresh Varma', seatNumber: 'B-205', score: 0, totalBuzzerWins: 0 },
+        { id: 'cand-4', name: 'Priya Dave', seatNumber: 'C-301', score: 0, totalBuzzerWins: 0 },
+      ],
+      buzzerPressFeed: [],
+      currentAnsweringRankIndex: 0,
 
       timerRunning: false,
       timerSecondsLeft: 30,
@@ -107,20 +120,12 @@ export const useGameStore = create<GameState>()(
       setEventMeta: (eventName, subtitle) => set({ eventName, subtitle }),
       startEvent: () => set({ eventStarted: true, currentRound: 'round1' }),
       goToRound: (round) => set({ currentRound: round }),
-      setTeams: (teams) => set({ teams }),
       setBank: (bank) => set({ bank }),
 
-      awardPoints: (teamId, round, points) =>
+      awardScore: (round, points) =>
         set((state) => ({
-          teams: state.teams.map((t) =>
-            t.id === teamId
-              ? {
-                  ...t,
-                  totalScore: t.totalScore + points,
-                  roundScores: { ...t.roundScores, [round]: t.roundScores[round] + points },
-                }
-              : t
-          ),
+          totalScore: state.totalScore + points,
+          roundScores: { ...state.roundScores, [round]: state.roundScores[round] + points },
         })),
 
       nextR1: () =>
@@ -140,26 +145,153 @@ export const useGameStore = create<GameState>()(
           r1Revealed: false,
         })),
 
-      nextR2: () =>
+      nextR2: () => {
         set((state) => ({
           r2Index: Math.min(state.r2Index + 1, state.bank.round2.length - 1),
-        })),
-      prevR2: () =>
+          buzzerStatus: 'idle',
+          buzzerPressFeed: [],
+          currentAnsweringRankIndex: 0,
+          buzzerOpenTime: null,
+        }));
+        buzzerSync.send({ type: 'RESET_BUZZER', payload: {} });
+      },
+      prevR2: () => {
         set((state) => ({
           r2Index: Math.max(state.r2Index - 1, 0),
-        })),
+          buzzerStatus: 'idle',
+          buzzerPressFeed: [],
+          currentAnsweringRankIndex: 0,
+          buzzerOpenTime: null,
+        }));
+        buzzerSync.send({ type: 'RESET_BUZZER', payload: {} });
+      },
       setR2TimerDuration: (d) => set({ r2TimerDuration: d, timerSecondsLeft: d }),
+      setRound2Mode: (mode) => set({ round2Mode: mode }),
 
-      nextR3: () =>
+      openBuzzer: () => {
+        const now = performance.now();
+        set({
+          buzzerStatus: 'open',
+          buzzerOpenTime: now,
+          buzzerPressFeed: [],
+          currentAnsweringRankIndex: 0,
+        });
+        sfx.buzzerOpen();
+        buzzerSync.send({
+          type: 'BUZZER_STATE_UPDATE',
+          payload: { status: 'open', openTime: now },
+        });
+      },
+
+      pressBuzzer: (candidateId, candidateName, seatNumber) => {
+        const state = get();
+        if (state.buzzerStatus !== 'open' && state.buzzerStatus !== 'locked') return;
+
+        // Check if candidate already buzzed
+        if (state.buzzerPressFeed.some((p) => p.candidateId === candidateId)) return;
+
+        const openTime = state.buzzerOpenTime ?? performance.now();
+        const now = performance.now();
+        const responseTimeMs = Math.round(now - openTime);
+
+        const rank = state.buzzerPressFeed.length + 1;
+        const newRecord: FastestFingerRecord = {
+          rank,
+          candidateId,
+          candidateName,
+          seatNumber,
+          timestamp: Date.now(),
+          responseTimeMs,
+        };
+
+        const updatedFeed = [...state.buzzerPressFeed, newRecord];
+
+        if (rank === 1) {
+          sfx.buzzerPress();
+          set({
+            buzzerStatus: 'locked',
+            buzzerPressFeed: updatedFeed,
+            currentAnsweringRankIndex: 0,
+          });
+          // Increment candidate buzzer wins
+          set((s) => ({
+            candidates: s.candidates.map((c) =>
+              c.id === candidateId ? { ...c, totalBuzzerWins: c.totalBuzzerWins + 1 } : c
+            ),
+          }));
+        } else {
+          set({ buzzerPressFeed: updatedFeed });
+        }
+
+        buzzerSync.send({
+          type: 'PRESS_BUZZER',
+          payload: newRecord,
+        });
+      },
+
+      resetBuzzer: () => {
+        set({
+          buzzerStatus: 'idle',
+          buzzerPressFeed: [],
+          currentAnsweringRankIndex: 0,
+          buzzerOpenTime: null,
+        });
+        buzzerSync.send({ type: 'RESET_BUZZER', payload: {} });
+      },
+
+      passToNextFastest: () => {
+        const state = get();
+        if (state.currentAnsweringRankIndex + 1 < state.buzzerPressFeed.length) {
+          sfx.navigate();
+          set({ currentAnsweringRankIndex: state.currentAnsweringRankIndex + 1 });
+        }
+      },
+
+      addCandidate: (name, seatNumber) => {
+        const newCandidate: Candidate = {
+          id: `cand-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          name: name.trim(),
+          seatNumber: seatNumber?.trim(),
+          score: 0,
+          totalBuzzerWins: 0,
+          joinedAt: Date.now(),
+        };
         set((state) => ({
-          r3Index: Math.min(state.r3Index + 1, state.bank.round3.length - 1),
-          r3Revealed: false,
-        })),
-      revealR3: () => set({ r3Revealed: true }),
+          candidates: [...state.candidates, newCandidate],
+        }));
+        return newCandidate;
+      },
 
-      spinWheelStart: () => set({ r4Spinning: true, r4SelectedTopicId: null }),
-      spinWheelStop: (topicId) => set({ r4Spinning: false, r4SelectedTopicId: topicId }),
-      forceStopSpin: () => set({ r4Spinning: false }),
+      importCandidates: (cList) => {
+        const newCandidates: Candidate[] = cList.map((c, i) => ({
+          id: c.id || `cand-imp-${Date.now()}-${i}`,
+          name: (c.name || `Candidate ${i + 1}`).trim(),
+          seatNumber: c.seatNumber || `Seat #${i + 1}`,
+          score: c.score || 0,
+          totalBuzzerWins: c.totalBuzzerWins || 0,
+          joinedAt: Date.now(),
+        }));
+        set((state) => ({
+          candidates: [...state.candidates, ...newCandidates],
+        }));
+      },
+
+      removeCandidate: (id) =>
+        set((state) => ({
+          candidates: state.candidates.filter((c) => c.id !== id),
+        })),
+
+      clearCandidates: () => set({ candidates: [] }),
+
+      awardCandidateScore: (candidateId, points) => {
+        set((state) => ({
+          candidates: state.candidates.map((c) =>
+            c.id === candidateId ? { ...c, score: c.score + points } : c
+          ),
+          totalScore: state.totalScore + points,
+          roundScores: { ...state.roundScores, round2: state.roundScores.round2 + points },
+        }));
+      },
 
       startTimer: (seconds) => set({ timerRunning: true, timerSecondsLeft: seconds }),
       pauseTimer: () => set({ timerRunning: false }),
@@ -175,33 +307,24 @@ export const useGameStore = create<GameState>()(
       toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
       resetGame: () =>
         set({
-          teams: initialTeams,
+          totalScore: 0,
+          roundScores: { round1: 0, round2: 0 },
           currentRound: 'dashboard',
           eventStarted: false,
           r1Index: 0,
           r1Revealed: false,
           r2Index: 0,
-          r3Index: 0,
-          r3Revealed: false,
-          r4SelectedTopicId: null,
-          r4Spinning: false,
           timerRunning: false,
+          buzzerStatus: 'idle',
+          buzzerPressFeed: [],
+          currentAnsweringRankIndex: 0,
         }),
     }),
     {
       name: 'gyan-challenge-storage',
-      // IndexedDB rather than the default localStorage — localStorage's
-      // ~5-10MB per-origin quota was silently failing to save once bhajan
-      // audio clips and picture-question images pushed the persisted
-      // state past it, which is why newly added content could disappear
-      // on refresh. IndexedDB's quota is far larger.
       storage: createJSONStorage(() => indexedDbStorage),
-      // These are transient, moment-to-moment UI flags — not something we ever
-      // want frozen into storage. If the page reloads mid-spin or mid-timer
-      // (e.g. a presenter accidentally refreshes), persisting these would leave
-      // the spin wheel or countdown permanently "stuck" on the next load.
       partialize: (state) => {
-        const { r4Spinning, timerRunning, timerSecondsLeft, r1Revealed, r3Revealed, ...rest } = state;
+        const { timerRunning, timerSecondsLeft, r1Revealed, buzzerStatus, buzzerPressFeed, ...rest } = state;
         return rest;
       },
     }

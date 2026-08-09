@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Maximize, QrCode, Play, Flame, Zap, Trophy, Sparkles, Tv } from 'lucide-react';
+import { Maximize, QrCode, Play, Flame, Zap, Tv } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import MandalaRing from '../components/MandalaRing';
 import OmSymbol from '../components/OmSymbol';
-import GlassCard from '../components/GlassCard';
 import BuzzerQRCodeModal from '../components/BuzzerQRCodeModal';
-import { buzzerSync } from '../utils/buzzerSync';
 import { sfx } from '../utils/sound';
 
 function toggleFullscreen() {
@@ -18,14 +16,9 @@ function toggleFullscreen() {
 }
 
 export default function PosterScreen() {
-  const { eventName, subtitle, candidates, goToRound, startEvent } = useGameStore();
+  const { eventName, subtitle, goToRound, startEvent } = useGameStore();
   const [showQRModal, setShowQRModal] = useState(false);
-  const [roomCode, setRoomCode] = useState('GYAN-LIVE');
   const [pureStageMode, setPureStageMode] = useState(false);
-
-  useEffect(() => {
-    setRoomCode(buzzerSync.getRoomCode());
-  }, []);
 
   return (
     <div className={`relative min-h-screen w-full flex flex-col justify-between items-center px-4 sm:px-8 py-12 text-center select-none overflow-hidden ${pureStageMode ? 'z-50 bg-night fixed inset-0' : ''}`}>
@@ -96,62 +89,6 @@ export default function PosterScreen() {
         <p className="mt-2 font-display text-lg sm:text-2xl text-marigold/90 tracking-widest font-semibold">
           એક દિવ્ય આધ્યાત્મિક ક્વિઝ મહોત્સવ
         </p>
-
-        {/* Live Event Details Card */}
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
-          <GlassCard className="p-4 text-center border-marigold/30 bg-white/[0.04]">
-            <span className="text-[10px] font-score uppercase tracking-widest text-cream/50 block">Audition Room</span>
-            <span className="font-score text-xl font-bold text-marigold">{roomCode}</span>
-          </GlassCard>
-
-          <GlassCard className="p-4 text-center border-marigold/30 bg-white/[0.04]">
-            <span className="text-[10px] font-score uppercase tracking-widest text-cream/50 block">Live Candidates</span>
-            <span className="font-score text-xl font-bold text-gradient-saffron">{candidates.length}+ Registered</span>
-          </GlassCard>
-
-          <GlassCard className="p-4 text-center border-marigold/30 bg-white/[0.04]">
-            <span className="text-[10px] font-score uppercase tracking-widest text-cream/50 block">Buzzer Round</span>
-            <span className="font-score text-xl font-bold text-emerald">10 Buzz Limit Active</span>
-          </GlassCard>
-        </div>
-      </motion.div>
-
-      {/* Quiz Rounds Overview & QR Action Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="relative z-10 w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-5 my-4"
-      >
-        <GlassCard className="p-5 text-left border-marigold/20 hover:border-marigold/60 transition-all">
-          <div className="flex items-center gap-3 mb-2 text-marigold">
-            <Sparkles size={20} />
-            <h3 className="font-display text-lg font-bold">Round 1 · Picture Quiz</h3>
-          </div>
-          <p className="text-xs font-body text-cream/70 leading-relaxed">
-            Spiritual image identification challenge with instant score rewards.
-          </p>
-        </GlassCard>
-
-        <GlassCard className="p-5 text-left border-marigold/20 hover:border-marigold/60 transition-all bg-saffron-500/10">
-          <div className="flex items-center gap-3 mb-2 text-saffron-400">
-            <Zap size={20} />
-            <h3 className="font-display text-lg font-bold">Round 2 · Fastest Finger</h3>
-          </div>
-          <p className="text-xs font-body text-cream/70 leading-relaxed">
-            Audition Mobile Buzzer System. Up to 10 candidates buzz in real time!
-          </p>
-        </GlassCard>
-
-        <GlassCard className="p-5 text-left border-marigold/20 hover:border-marigold/60 transition-all">
-          <div className="flex items-center gap-3 mb-2 text-emerald">
-            <Trophy size={20} />
-            <h3 className="font-display text-lg font-bold">Scoreboard & Champion</h3>
-          </div>
-          <p className="text-xs font-body text-cream/70 leading-relaxed">
-            Live scoreboards, total points leaderboard, and Gyan winner celebration.
-          </p>
-        </GlassCard>
       </motion.div>
 
       {/* Action Buttons Footer */}

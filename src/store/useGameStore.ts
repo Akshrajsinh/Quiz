@@ -190,6 +190,9 @@ export const useGameStore = create<GameState>()(
         // Check if candidate already buzzed
         if (state.buzzerPressFeed.some((p) => p.candidateId === candidateId)) return;
 
+        // Up to 10 candidates can press per buzzer round
+        if (state.buzzerPressFeed.length >= 10) return;
+
         const openTime = state.buzzerOpenTime ?? Date.now();
         const now = Date.now();
         const responseTimeMs = Math.max(10, Math.round(now - openTime));
@@ -205,28 +208,35 @@ export const useGameStore = create<GameState>()(
         };
 
         const updatedFeed = [...state.buzzerPressFeed, newRecord];
+        const isMaxReached = updatedFeed.length >= 10;
+        const nextStatus: BuzzerStatus = isMaxReached ? 'locked' : 'open';
 
         if (rank === 1) {
           sfx.buzzerPress();
-          set({
-            buzzerStatus: 'locked',
-            buzzerPressFeed: updatedFeed,
-            currentAnsweringRankIndex: 0,
-          });
-          // Increment candidate buzzer wins
           set((s) => ({
             candidates: s.candidates.map((c) =>
               c.id === candidateId ? { ...c, totalBuzzerWins: c.totalBuzzerWins + 1 } : c
             ),
           }));
-        } else {
-          set({ buzzerPressFeed: updatedFeed });
         }
+
+        set({
+          buzzerStatus: nextStatus,
+          buzzerPressFeed: updatedFeed,
+          currentAnsweringRankIndex: 0,
+        });
 
         buzzerSync.send({
           type: 'PRESS_BUZZER',
           payload: newRecord,
         });
+
+        if (isMaxReached) {
+          buzzerSync.send({
+            type: 'BUZZER_STATE_UPDATE',
+            payload: { status: 'locked', openTime: state.buzzerOpenTime },
+          });
+        }
       },
 
       resetBuzzer: () => {

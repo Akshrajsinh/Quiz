@@ -45,7 +45,7 @@ export default function HostBuzzerFeedPanel() {
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="text-xs font-score bg-white/10 px-2.5 py-0.5 rounded-full text-marigold font-bold">
-            {buzzerPressFeed.length} Buzzes
+            {buzzerPressFeed.length} / 10 Buzzes
           </span>
           <span className="text-[10px] font-score">
             {connStatus === 'connected' ? (

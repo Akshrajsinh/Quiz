@@ -18,14 +18,14 @@ export default function BuzzerLockoutBanner() {
         <div className="glass rounded-3xl p-6 border-2 border-emerald/50 bg-emerald/10 shadow-glow-green text-center flex flex-col items-center gap-3">
           <div className="flex items-center gap-3 text-emerald font-score text-sm uppercase tracking-widest font-bold">
             <span className="h-3 w-3 rounded-full bg-emerald animate-ping" />
-            Buzzers Active · Fastest Finger Round
+            Buzzers Active · Multi-Candidate Fastest Finger
             <span className="h-3 w-3 rounded-full bg-emerald animate-ping" />
           </div>
           <h3 className="font-display text-3xl sm:text-4xl font-bold text-cream">
             ⚡ PRESS YOUR BUZZER NOW!
           </h3>
           <p className="text-sm font-body text-cream/70">
-            250+ Candidates are active. The first candidate to tap locks out all other buzzers!
+            Every candidate can press! The system will collect up to 10 buzzer responses and rank reaction times.
           </p>
         </div>
       </motion.div>
@@ -55,7 +55,14 @@ export default function BuzzerLockoutBanner() {
             <div className="text-left">
               <div className="flex items-center gap-2 text-xs font-score text-marigold uppercase tracking-widest font-bold mb-1">
                 <Zap size={16} fill="currentColor" />
-                Buzzer Winner · Rank #{activeRecord.rank}
+                {buzzerStatus === 'open' ? (
+                  <span className="text-emerald font-bold animate-pulse">
+                    🟢 BUZZERS OPEN ({buzzerPressFeed.length}/10 Buzzes)
+                  </span>
+                ) : (
+                  <span>🔒 BUZZERS LOCKED (10/10 Buzzes)</span>
+                )}
+                <span className="text-cream/50 font-normal">· Active Turn: Rank #{activeRecord.rank}</span>
               </div>
               <h2 className="font-display text-3xl sm:text-5xl font-bold text-cream drop-shadow-md">
                 {activeRecord.candidateName}
@@ -81,16 +88,23 @@ export default function BuzzerLockoutBanner() {
           </div>
         </div>
 
-        {/* Top 5 Fastest Finger Summary */}
+        {/* Top Fastest Finger Summary (Up to 10) */}
         {buzzerPressFeed.length > 1 && (
           <div className="mt-6 pt-5 border-t border-white/10 flex flex-col gap-2">
-            <span className="text-xs font-score text-cream/50 uppercase tracking-widest flex items-center gap-1.5">
-              <Trophy size={14} className="text-marigold" /> Top Fastest Finger Presses
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {buzzerPressFeed.slice(0, 3).map((rec) => (
+            <div className="flex items-center justify-between text-xs font-score text-cream/50 uppercase tracking-widest">
+              <span className="flex items-center gap-1.5">
+                <Trophy size={14} className="text-marigold" /> Recorded Buzzer Ranks ({buzzerPressFeed.length}/10)
+              </span>
+              {buzzerStatus === 'open' && (
+                <span className="text-emerald animate-pulse font-bold text-[11px]">
+                  🟢 Buzzers open for other candidates...
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              {buzzerPressFeed.map((rec) => (
                 <div
-                  key={rec.candidateId}
+                  key={`${rec.candidateId}-${rec.rank}`}
                   className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between ${
                     rec.rank === activeRecord.rank
                       ? 'bg-marigold/20 border border-marigold text-cream font-bold'
@@ -100,7 +114,7 @@ export default function BuzzerLockoutBanner() {
                   <span className="truncate">
                     #{rec.rank} {rec.candidateName}
                   </span>
-                  <span className="font-score opacity-80">{(rec.responseTimeMs / 1000).toFixed(3)}s</span>
+                  <span className="font-score opacity-80 text-[10px] shrink-0">{(rec.responseTimeMs / 1000).toFixed(3)}s</span>
                 </div>
               ))}
             </div>

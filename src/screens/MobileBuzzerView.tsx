@@ -97,7 +97,6 @@ export default function MobileBuzzerView() {
         const record = msg.payload;
 
         if (record.rank === 1) {
-          setBuzzerStatus('locked');
           setWinnerName(record.candidateName);
         }
 
@@ -342,13 +341,17 @@ export default function MobileBuzzerView() {
                 <div className="glass p-4 rounded-2xl border border-yellow-500/50 text-yellow-300 text-sm font-score animate-pulse font-bold">
                   ⚡ Press registered! Calculating rank on host system...
                 </div>
-              ) : winnerName ? (
-                <div className="glass p-4 rounded-2xl text-cream/70 text-xs font-score">
-                  🔒 Locked by <span className="text-marigold font-bold">{winnerName}</span>!
+              ) : winnerName && buzzerStatus === 'locked' ? (
+                <div className="glass p-4 rounded-2xl text-cream/70 text-xs font-score border border-white/10">
+                  🔒 Locked! 10 Buzzes received. 1st Buzzer Winner: <span className="text-marigold font-bold">{winnerName}</span>
+                </div>
+              ) : buzzerStatus === 'locked' ? (
+                <div className="glass p-4 rounded-2xl text-cream/70 text-xs font-score border border-white/10">
+                  🔒 Buzzers Locked for this question!
                 </div>
               ) : buzzerStatus === 'open' ? (
                 <div className="glass p-4 rounded-2xl border border-emerald/50 text-emerald text-sm font-score animate-pulse font-bold">
-                  🟢 Buzzers Active! Tap the big button as fast as you can!
+                  🟢 Buzzers Active! Tap the big button as fast as you can! (Up to 10 candidates can press)
                 </div>
               ) : (
                 <div className="glass p-4 rounded-2xl text-cream/40 text-xs font-score">

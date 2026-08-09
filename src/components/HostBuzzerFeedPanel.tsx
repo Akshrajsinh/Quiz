@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, SkipForward, Users, Search, CheckCircle2, Clock } from 'lucide-react';
+import { Zap, SkipForward, Users, Search, CheckCircle2, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
+import { buzzerSync, type ConnectionStatus } from '../utils/buzzerSync';
 
 export default function HostBuzzerFeedPanel() {
   const {
@@ -15,6 +16,14 @@ export default function HostBuzzerFeedPanel() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showManualAdd, setShowManualAdd] = useState(false);
+  const [connStatus, setConnStatus] = useState<ConnectionStatus>('connecting');
+  const [roomCode, setRoomCode] = useState('GYAN-LIVE');
+
+  useEffect(() => {
+    setRoomCode(buzzerSync.getRoomCode());
+    const unsub = buzzerSync.onStatusChange((s) => setConnStatus(s));
+    return () => unsub();
+  }, []);
 
   const activeCandidateRecord = buzzerPressFeed[currentAnsweringRankIndex];
 
@@ -29,11 +38,31 @@ export default function HostBuzzerFeedPanel() {
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2">
           <Zap className="text-marigold animate-pulse" size={20} />
-          <h3 className="font-display text-lg text-cream font-bold">Host Live Buzzer Feed</h3>
+          <div>
+            <h3 className="font-display text-lg text-cream font-bold leading-none">Host Live Buzzer Feed</h3>
+            <span className="text-[10px] text-cream/50 font-score">Room: {roomCode}</span>
+          </div>
         </div>
-        <span className="text-xs font-score bg-white/10 px-2.5 py-1 rounded-full text-marigold">
-          {buzzerPressFeed.length} Buzzes
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs font-score bg-white/10 px-2.5 py-0.5 rounded-full text-marigold font-bold">
+            {buzzerPressFeed.length} Buzzes
+          </span>
+          <span className="text-[10px] font-score">
+            {connStatus === 'connected' ? (
+              <span className="text-emerald font-semibold flex items-center gap-1">
+                <Wifi size={10} /> Online Sync
+              </span>
+            ) : connStatus === 'connecting' ? (
+              <span className="text-amber-400 font-semibold flex items-center gap-1">
+                <RefreshCw size={10} className="animate-spin" /> Syncing...
+              </span>
+            ) : (
+              <span className="text-red-400 font-semibold flex items-center gap-1">
+                <WifiOff size={10} /> Local Only
+              </span>
+            )}
+          </span>
+        </div>
       </div>
 
       {/* Active Answering Participant Banner */}
@@ -65,7 +94,7 @@ export default function HostBuzzerFeedPanel() {
         </div>
       ) : buzzerStatus === 'open' ? (
         <div className="p-4 rounded-2xl bg-emerald/10 border border-emerald/30 text-center text-emerald font-score text-sm animate-pulse">
-          🟢 BUZZERS ACTIVE — Waiting for 250+ Candidates to Press!
+          🟢 BUZZERS ACTIVE — Waiting for Audience Mobile Buzzers!
         </div>
       ) : (
         <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center text-cream/50 font-score text-xs">
@@ -125,7 +154,7 @@ export default function HostBuzzerFeedPanel() {
         </AnimatePresence>
       </div>
 
-      {/* Stage Manual Trigger (Host manually selects from 250+ candidate roster) */}
+      {/* Stage Manual Trigger (Host manually selects from candidate roster) */}
       <div className="border-t border-white/10 pt-3">
         <button
           onClick={() => setShowManualAdd(!showManualAdd)}

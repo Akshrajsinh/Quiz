@@ -125,11 +125,18 @@ export default function Dashboard() {
             onClick={() => setShowManager(true)}
             className="btn-secondary flex items-center justify-center gap-2"
           >
-            <Settings2 size={18} /> Manage Data
+            <Settings2 size={18} /> Manage & Export Data
           </button>
         </div>
 
         <div className="flex items-center justify-center gap-4 mt-2 text-xs text-cream/40">
+          <button
+            onClick={() => setShowManager(true)}
+            className="flex items-center gap-1.5 hover:text-marigold transition-colors text-marigold/80 font-score"
+          >
+            📥 1-Click Export / Import Questions
+          </button>
+          <span>·</span>
           <button
             onClick={() => {
               if (confirm('Reset the entire event? All scores and progress will be cleared.')) {

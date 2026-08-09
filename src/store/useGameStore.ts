@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import defaultBank from '../data/questionBank.json';
 import { indexedDbStorage } from './indexedDbStorage';
 import type { RoundKey, QuestionBank, Round2Mode, BuzzerStatus, Candidate, FastestFingerRecord } from '../types';
-import { buzzerSync } from '../utils/buzzerSync';
+import { buzzerSync, type SyncMessage } from '../utils/buzzerSync';
 import { sfx } from '../utils/sound';
 
 interface GameState {
@@ -169,7 +169,7 @@ export const useGameStore = create<GameState>()(
       setRound2Mode: (mode) => set({ round2Mode: mode }),
 
       openBuzzer: () => {
-        const now = performance.now();
+        const now = Date.now();
         set({
           buzzerStatus: 'open',
           buzzerOpenTime: now,
@@ -190,9 +190,9 @@ export const useGameStore = create<GameState>()(
         // Check if candidate already buzzed
         if (state.buzzerPressFeed.some((p) => p.candidateId === candidateId)) return;
 
-        const openTime = state.buzzerOpenTime ?? performance.now();
-        const now = performance.now();
-        const responseTimeMs = Math.round(now - openTime);
+        const openTime = state.buzzerOpenTime ?? Date.now();
+        const now = Date.now();
+        const responseTimeMs = Math.max(10, Math.round(now - openTime));
 
         const rank = state.buzzerPressFeed.length + 1;
         const newRecord: FastestFingerRecord = {
@@ -200,7 +200,7 @@ export const useGameStore = create<GameState>()(
           candidateId,
           candidateName,
           seatNumber,
-          timestamp: Date.now(),
+          timestamp: now,
           responseTimeMs,
         };
 
@@ -330,3 +330,37 @@ export const useGameStore = create<GameState>()(
     }
   )
 );
+
+// Host listener for real-time mobile candidate events
+if (typeof window !== 'undefined') {
+  buzzerSync.subscribe((msg: SyncMessage) => {
+    // Only execute if running as Host (not mobile buzzer mode)
+    const isMobileView = window.location.search.includes('mode=buzzer');
+    if (isMobileView) return;
+
+    const store = useGameStore.getState();
+
+    if (msg.type === 'PRESS_BUZZER') {
+      const payload = msg.payload;
+      // If raw candidate press from mobile (no rank assigned yet)
+      if (payload && payload.candidateId && typeof payload.rank !== 'number') {
+        store.pressBuzzer(payload.candidateId, payload.candidateName, payload.seatNumber);
+      }
+    } else if (msg.type === 'JOIN_CANDIDATE') {
+      const payload = msg.payload;
+      if (payload && payload.candidateName) {
+        const exists = store.candidates.some(
+          (c) => c.id === payload.candidateId || c.name.toLowerCase() === payload.candidateName.toLowerCase()
+        );
+        if (!exists) {
+          store.addCandidate(payload.candidateName, payload.seatNumber);
+        }
+        // Respond with current buzzer status so joining client syncs immediately
+        buzzerSync.send({
+          type: 'BUZZER_STATE_UPDATE',
+          payload: { status: store.buzzerStatus, openTime: store.buzzerOpenTime },
+        });
+      }
+    }
+  });
+}

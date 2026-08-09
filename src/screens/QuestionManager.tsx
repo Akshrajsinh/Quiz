@@ -157,21 +157,76 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
     sfx.click();
   };
 
-  const handleFile = async (file: File) => {
+  const exportAllQuestions = () => {
+    try {
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        eventName,
+        subtitle,
+        round1: bank.round1,
+        round2: bank.round2,
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gyan-challenge-questions-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      sfx.fanfare();
+      setImportMsg(`Successfully exported ${bank.round1.length} Round 1 & ${bank.round2.length} Round 2 questions!`);
+    } catch {
+      sfx.wrong();
+      setImportMsg('Could not export questions.');
+    }
+  };
+
+  const handleFileImport = async (file: File, mode: 'append' | 'replace') => {
     try {
       const text = await file.text();
+      let importedR1: ImageQuestion[] = [];
+      let importedR2: MCQQuestion[] = [];
+
       if (file.name.endsWith('.json')) {
         const parsed = JSON.parse(text);
-        setBank({ ...bank, ...parsed });
-        setImportMsg(`Imported ${Object.keys(parsed).length} section(s) from JSON.`);
+        if (Array.isArray(parsed.round1)) importedR1 = parsed.round1;
+        if (Array.isArray(parsed.round2)) importedR2 = parsed.round2;
+        // Fallback if flat array or structure
+        if (!Array.isArray(parsed.round1) && !Array.isArray(parsed.round2)) {
+          if (Array.isArray(parsed)) importedR2 = parsed;
+        }
       } else {
-        const questions = parseCsvToQuestions(text);
-        setBank({ ...bank, round2: questions });
-        setImportMsg(`Imported ${questions.length} Round 2 (MCQ) questions from CSV.`);
+        importedR2 = parseCsvToQuestions(text);
+      }
+
+      if (importedR1.length === 0 && importedR2.length === 0) {
+        setImportMsg('No valid questions found in file.');
+        sfx.wrong();
+        return;
+      }
+
+      if (mode === 'replace') {
+        setBank({
+          round1: importedR1.length > 0 ? importedR1 : bank.round1,
+          round2: importedR2.length > 0 ? importedR2 : bank.round2,
+        });
+        setImportMsg(
+          `Replaced bank with ${importedR1.length} Round 1 & ${importedR2.length} Round 2 questions!`
+        );
+      } else {
+        // Append mode
+        setBank({
+          round1: [...bank.round1, ...importedR1],
+          round2: [...bank.round2, ...importedR2],
+        });
+        setImportMsg(
+          `Added ${importedR1.length} Round 1 & ${importedR2.length} Round 2 new questions to bank!`
+        );
       }
       sfx.correct();
     } catch (err) {
-      setImportMsg('Could not parse that file. Check the format and try again.');
+      setImportMsg('Could not parse file. Check format and try again.');
       sfx.wrong();
     }
   };
@@ -225,7 +280,7 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
               }`}
             >
               {t === 'import'
-                ? 'Bulk Import'
+                ? 'Export / Import Bank'
                 : t === 'pictures'
                 ? 'Round 1 · Pictures'
                 : t === 'questions'
@@ -234,8 +289,8 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-        {importMsg && (tab === 'pictures' || tab === 'questions') && (
-          <p className="text-sm text-kumkum mb-4 text-center">{importMsg}</p>
+        {importMsg && (
+          <p className="text-sm text-marigold mb-4 text-center font-score font-semibold">{importMsg}</p>
         )}
 
         {tab === 'pictures' && (
@@ -572,33 +627,68 @@ export default function QuestionManager({ onClose }: { onClose: () => void }) {
         )}
 
         {tab === 'import' && (
-          <div className="space-y-4">
-            <p className="text-sm text-cream/60">
-              Import Round 2 (MCQ) questions from a CSV (exported from Excel) or a full question bank JSON.
-              Existing questions for imported sections will be replaced.
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,.csv"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              <Upload size={18} /> Choose File (.json / .csv)
-            </button>
-            <button
-              onClick={downloadTemplate}
-              className="btn-ghost w-full flex items-center justify-center gap-2 py-2"
-            >
-              <Download size={16} /> Download CSV Template
-            </button>
-            {importMsg && <p className="text-sm text-marigold text-center">{importMsg}</p>}
+          <div className="space-y-6">
+            {/* Section 1: 1-Click Export */}
+            <div className="glass rounded-2xl p-5 border border-marigold/40 space-y-3">
+              <div className="flex items-center gap-2 text-marigold font-score text-xs uppercase tracking-wider font-bold">
+                <Download size={18} /> 1-Click Export All Questions
+              </div>
+              <p className="text-xs text-cream/70 font-body">
+                Export all {bank.round1.length} Round 1 picture questions and {bank.round2.length} Round 2 MCQ questions into a single backup JSON file.
+              </p>
+              <button
+                onClick={exportAllQuestions}
+                className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 shadow-glow"
+              >
+                <Download size={18} /> Export All Questions (.json)
+              </button>
+            </div>
+
+            {/* Section 2: Import Questions */}
+            <div className="glass rounded-2xl p-5 border border-white/10 space-y-4">
+              <div className="flex items-center gap-2 text-cream font-score text-xs uppercase tracking-wider font-bold">
+                <Upload size={18} className="text-saffron-400" /> Import & Add Questions
+              </div>
+              <p className="text-xs text-cream/70 font-body">
+                Import questions from a JSON backup file or CSV template. Choose whether to append to existing bank or replace all questions.
+              </p>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const mode = confirm(
+                      `Click OK to APPEND new questions to existing bank.\nClick CANCEL to REPLACE all existing questions.`
+                    )
+                      ? 'append'
+                      : 'replace';
+                    handleFileImport(file, mode);
+                  }
+                }}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary py-3 text-xs flex items-center justify-center gap-2 text-marigold border-marigold/40"
+                >
+                  <Plus size={16} /> Import & Append to Bank
+                </button>
+                <button
+                  onClick={downloadTemplate}
+                  className="btn-ghost py-3 text-xs flex items-center justify-center gap-2 border border-white/10"
+                >
+                  <Download size={16} /> Download CSV Template
+                </button>
+              </div>
+            </div>
+
             <div className="brass-divider" />
-            <p className="text-xs text-cream/40">
+            <p className="text-xs text-cream/40 text-center font-score">
               Currently loaded: {bank.round1.length} picture questions · {bank.round2.length} MCQ questions
             </p>
           </div>
